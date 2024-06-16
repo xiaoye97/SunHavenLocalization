@@ -1,13 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.IO;
-using System.IO.Compression;
+using System.Collections.Generic;
 using ICSharpCode.SharpZipLib.Zip;
 using ICSharpCode.SharpZipLib.Checksum;
-using System.Security.Cryptography;
 
 namespace SunHavenLocalizationPublishTool
 {
@@ -113,7 +108,7 @@ namespace SunHavenLocalizationPublishTool
             }
             catch (Exception e)
             {
-                throw;
+                throw e;
             }
         }
 
@@ -151,7 +146,7 @@ namespace SunHavenLocalizationPublishTool
             }
             catch (Exception e)
             {
-                throw;
+                throw e;
             }
         }
 

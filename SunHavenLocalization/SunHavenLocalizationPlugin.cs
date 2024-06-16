@@ -37,6 +37,7 @@ namespace SunHavenLocalization
             AllowMultipleTimesLogGetTranslationFailCall = Config.Bind<bool>("dev", "AllowMultipleTimesLogGetTranslationFailCall", false);
             LogInfo("SunHavenLocalization Loaded.");
             Harmony.CreateAndPatchAll(typeof(SunHavenLocalizationPlugin));
+            Credits.ShowCredits();
         }
 
         public void Update()
@@ -122,6 +123,24 @@ namespace SunHavenLocalization
                             }
                         }
                     }
+                }
+            }
+        }
+
+        public void SearchTerm(string Key)
+        {
+            var source = GameObject.FindObjectOfType<LanguageSource>();
+            foreach (var term in source.SourceData.mTerms)
+            {
+                if (term.Term == Key)
+                {
+                    LogInfo($"========搜索到指定的Term [{Key}]");
+                    for (int i = 0; i < term.Languages.Length; i++)
+                    {
+                        LogInfo($"[{i}] {term.Languages[i]}");
+                    }
+                    LogInfo($"========");
+                    break;
                 }
             }
         }
