@@ -1,10 +1,8 @@
 ﻿using MiniExcelLibs;
 using SunHavenLocalization;
 using System;
-using System.Collections.Generic;
 using System.Data;
-using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
+using System.Collections.Generic;
 
 namespace SunHavenLocalizationExcelTool
 {
@@ -37,28 +35,21 @@ namespace SunHavenLocalizationExcelTool
 
         public static void LocToExcel(string locPath)
         {
-            Console.WriteLine($"开始读取 {locPath}");
+            Console.WriteLine($"Loading {locPath}");
             LocSheet sheet = null;
             try
             {
-                var bytes = File.ReadAllBytes(locPath);
-                MemoryStream stream = new MemoryStream(bytes);
-                //创建BinaryFormatter，准备反序列化
-                BinaryFormatter bf = new BinaryFormatter();
-                //反序列化
-                sheet = (LocSheet)bf.Deserialize(stream);
-                //关闭流
-                stream.Close();
+                sheet = CommonTool.LoadLocSheet(locPath);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"读取文件时出现异常:\n{ex}");
+                Console.WriteLine($"Exception when loading file:\n{ex}");
                 return;
             }
 
             if (sheet == null)
             {
-                Console.WriteLine($"反序列化文件失败");
+                Console.WriteLine($"Deserialize file fail.");
                 return;
             }
             DataTable infoTable = new DataTable();
@@ -69,14 +60,14 @@ namespace SunHavenLocalizationExcelTool
             infoTable.Rows.Add("GitHub", "https://github.com/xiaoye97");
             infoTable.Rows.Add("LanguageName", sheet.LanguageName);
             infoTable.Rows.Add("Version", sheet.Version);
-            infoTable.Rows.Add("LastDumpTime", DumpTool.TimeToString(sheet.LastDumpTime));
+            infoTable.Rows.Add("LastDumpTime", CommonTool.TimeToString(sheet.LastDumpTime));
             infoTable.Rows.Add("LineCount", sheet.LineCount.ToString());
             infoTable.Rows.Add("OriginalCharCount", sheet.OriginalCharCount.ToString());
 
             List<LocItemSave> locItemSaves = new List<LocItemSave>();
             foreach (var kv in sheet.Dict)
             {
-                locItemSaves.Add(kv.Value.ToLocItemSave());
+                locItemSaves.Add(LocItemToSave(kv.Value));
             }
             locItemSaves.Sort((a, b) => a.Key.CompareTo(b.Key));
             LocItemSave[] dataSheet = locItemSaves.ToArray();
@@ -100,11 +91,11 @@ namespace SunHavenLocalizationExcelTool
             try
             {
                 MiniExcel.SaveAs(path, dataSet, excelType: ExcelType.XLSX, overwriteFile: true);
-                Console.WriteLine($"保存了文件 {path}");
+                Console.WriteLine($"saved {path}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"保存文件 {path} 时出现异常, 请注意检查:\n{ex}");
+                Console.WriteLine($"Exception when save {path}:\n{ex}");
             }
         }
 
@@ -124,7 +115,7 @@ namespace SunHavenLocalizationExcelTool
             }
             sheet.LanguageName = Table1Dict["LanguageName"];
             int.TryParse(Table1Dict["Version"], out sheet.Version);
-            sheet.LastDumpTime = DumpTool.StringToTime(Table1Dict["LastDumpTime"]);
+            sheet.LastDumpTime = CommonTool.StringToTime(Table1Dict["LastDumpTime"]);
             int.TryParse(Table1Dict["LineCount"], out sheet.LineCount);
             long.TryParse(Table1Dict["OriginalCharCount"], out sheet.OriginalCharCount);
 
@@ -149,7 +140,7 @@ namespace SunHavenLocalizationExcelTool
                 locItem.Original = list[1];
                 locItem.OriginalTranslation = list[2];
                 locItem.Translation = list[3];
-                locItem.UpdateTime = DumpTool.StringToTime(list[4]);
+                locItem.UpdateTime = CommonTool.StringToTime(list[4]);
                 locItem.UpdateMode = (UpdateMode)Enum.Parse(typeof(UpdateMode), list[5]);
                 locItem.OriginalUpdateNote = list[6];
                 sheet.Dict[locItem.Key] = locItem;
@@ -158,24 +149,32 @@ namespace SunHavenLocalizationExcelTool
             string path = $"{Environment.CurrentDirectory}/{sheet.LanguageName}.xyloc";
             try
             {
-                FileStream fs = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
-                //创建BinaryFormatter，准备序列化
-                BinaryFormatter bf = new BinaryFormatter();
-                //序列化
-                bf.Serialize(fs, sheet);
-                //关闭流
-                fs.Close();
-                Console.WriteLine($"保存了文件 {path}");
+                CommonTool.SaveLocSheet(path, sheet);
+                Console.WriteLine($"saved {path}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"保存文件 {path} 时出现异常, 请注意检查:\n{ex}");
+                Console.WriteLine($"Exception when save {path}:\n{ex}");
             }
         }
 
         public static void LogUseage()
         {
             Console.WriteLine("Useage: \n\tinput <langName.xyloc> to generate excel.\n\tinput <langName.xlsx> to generate xyloc");
+        }
+
+        public static LocItemSave LocItemToSave(LocItem locItem)
+        {
+            return new LocItemSave()
+            {
+                Key = locItem.Key,
+                Original = locItem.Original,
+                OriginalTranslation = locItem.OriginalTranslation,
+                Translation = locItem.Translation,
+                UpdateTime = CommonTool.TimeToString(locItem.UpdateTime),
+                UpdateMode = locItem.UpdateMode.ToString(),
+                OriginalUpdateNote = locItem.OriginalUpdateNote
+            };
         }
     }
 }

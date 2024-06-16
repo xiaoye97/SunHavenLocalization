@@ -2,17 +2,13 @@
 using I2.Loc;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 
 namespace SunHavenLocalization
 {
     public static class DumpTool
     {
-        public static string TimeFormat = "yyyy-MM-dd HH:mm:ss";
-
         public static void DumpAll()
         {
             DateTime now = DateTime.Now;
@@ -68,42 +64,45 @@ namespace SunHavenLocalization
                     string ori = term.Languages[0];
                     for (int langIndex = 0; langIndex < term.Languages.Length; langIndex++)
                     {
-                        string oriTranslation = term.Languages[langIndex];
-                        string langName = newStorage.IndexLangNameDict[langIndex];
-                        LocSheet newSheet = newStorage.Storage[langName];
-                        // 如果表里有此条目, 则检查是否更新了
-                        if (newSheet.Dict.ContainsKey(key))
+                        if (newStorage.IndexLangNameDict.ContainsKey(langIndex))
                         {
-                            var item = newSheet.Dict[key];
-                            // 如果条目没有更新, 则将更新类型置为空
-                            if (item.Original == ori)
+                            string oriTranslation = term.Languages[langIndex];
+                            string langName = newStorage.IndexLangNameDict[langIndex];
+                            LocSheet newSheet = newStorage.Storage[langName];
+                            // 如果表里有此条目, 则检查是否更新了
+                            if (newSheet.Dict.ContainsKey(key))
                             {
-                                item.UpdateMode = UpdateMode.None;
-                                item.OriginalUpdateNote = "";
+                                var item = newSheet.Dict[key];
+                                // 如果条目没有更新, 则将更新类型置为空
+                                if (item.Original == ori)
+                                {
+                                    item.UpdateMode = UpdateMode.None;
+                                    item.OriginalUpdateNote = "";
+                                }
+                                // 如果条目有更新, 则将更新类型置为更新
+                                else
+                                {
+                                    item.OriginalUpdateNote = $"[{CommonTool.TimeToString(item.UpdateTime)}]{item.Original}\n[{CommonTool.TimeToString(now)}]{ori}";
+
+                                    item.Original = ori;
+                                    item.OriginalTranslation = oriTranslation;
+                                    item.UpdateTime = now;
+                                    item.UpdateMode = UpdateMode.Update;
+                                }
                             }
-                            // 如果条目有更新, 则将更新类型置为更新
+                            // 如果表里没有此条目, 则新增
                             else
                             {
-                                item.OriginalUpdateNote = $"[{TimeToString(item.UpdateTime)}]{item.Original}\n[{TimeToString(now)}]{ori}";
-
-                                item.Original = ori;
-                                item.OriginalTranslation = oriTranslation;
-                                item.UpdateTime = now;
-                                item.UpdateMode = UpdateMode.Update;
+                                LocItem item = new LocItem()
+                                {
+                                    Key = key,
+                                    Original = ori,
+                                    OriginalTranslation = oriTranslation,
+                                    UpdateTime = now,
+                                    UpdateMode = UpdateMode.New
+                                };
+                                newSheet.Dict[key] = item;
                             }
-                        }
-                        // 如果表里没有此条目, 则新增
-                        else
-                        {
-                            LocItem item = new LocItem()
-                            {
-                                Key = key,
-                                Original = ori,
-                                OriginalTranslation = oriTranslation,
-                                UpdateTime = now,
-                                UpdateMode = UpdateMode.New
-                            };
-                            newSheet.Dict[key] = item;
                         }
                     }
                 }
@@ -148,18 +147,12 @@ namespace SunHavenLocalization
         {
             try
             {
-                FileStream fs = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
-                //创建BinaryFormatter，准备序列化
-                BinaryFormatter bf = new BinaryFormatter();
-                //序列化
-                bf.Serialize(fs, sheet);
-                //关闭流
-                fs.Close();
-                SunHavenLocalizationPlugin.LogInfo($"保存了文件 {path}");
+                CommonTool.SaveLocSheet(path, sheet);
+                SunHavenLocalizationPlugin.LogInfo($"saved {path}");
             }
             catch (Exception ex)
             {
-                SunHavenLocalizationPlugin.LogError($"保存文件 {path} 时出现异常, 请注意检查:\n{ex}");
+                SunHavenLocalizationPlugin.LogError($"Exception when save {path}:\n{ex}");
             }
         }
 
@@ -170,26 +163,18 @@ namespace SunHavenLocalization
             for (int i = 0; i < source.SourceData.mLanguages.Count; i++)
             {
                 var lang = source.SourceData.mLanguages[i];
-                store.LangNameIndexDict[lang.Name] = i;
-                store.IndexLangNameDict[i] = lang.Name;
-                if (!store.Storage.ContainsKey(lang.Name))
+                if (!string.IsNullOrWhiteSpace(lang.Code))
                 {
-                    store.Storage.Add(lang.Name, new LocSheet());
+                    store.LangNameIndexDict[lang.Code] = i;
+                    store.IndexLangNameDict[i] = lang.Code;
+                    if (!store.Storage.ContainsKey(lang.Code))
+                    {
+                        store.Storage.Add(lang.Code, new LocSheet());
+                    }
+                    store.Storage[lang.Code].LanguageName = lang.Code;
+                    store.Storage[lang.Code].LanguageIndex = i;
                 }
-                store.Storage[lang.Name].LanguageName = lang.Name;
-                store.Storage[lang.Name].LanguageIndex = i;
             }
-        }
-
-        public static string TimeToString(DateTime time)
-        {
-            return time.ToString(TimeFormat);
-        }
-
-        public static DateTime StringToTime(string str)
-        {
-            DateTime dateTime = DateTime.ParseExact(str, TimeFormat, CultureInfo.InvariantCulture);
-            return dateTime;
         }
     }
 }

@@ -77,7 +77,6 @@ namespace SunHavenLocalization
         {
             if (LoadedLocStorage == null)
             {
-                LogInfo("翻译库为空,需要加载");
                 LoadTool.LoadAll();
             }
             var termData = LocalizationManager.GetTermData(Term);
@@ -85,7 +84,7 @@ namespace SunHavenLocalization
             {
                 if (termData.TermType == eTermType.Text)
                 {
-                    if (LoadedLocStorage.Storage.TryGetValue(LocalizationManager.CurrentLanguage, out var sheet))
+                    if (LoadedLocStorage.Storage.TryGetValue(LocalizationManager.CurrentLanguageCode, out var sheet))
                     {
                         if (sheet.Dict.TryGetValue(Term, out var locItem))
                         {
@@ -96,7 +95,7 @@ namespace SunHavenLocalization
                                 {
                                     if (AllowMultipleTimesLogGetTranslationSuccCall.Value || !SuccKeys.Contains(Term))
                                     {
-                                        LogInfo($"翻译插件:游戏取得翻译 Key:[{Term}] 翻译:[{locItem.Translation}]");
+                                        LogInfo($"GetTranslation Key:[{Term}] Translation:[{locItem.Translation}]");
                                     }
                                     if (!SuccKeys.Contains(Term))
                                     {
@@ -112,7 +111,7 @@ namespace SunHavenLocalization
                                     {
                                         if (AllowMultipleTimesLogGetTranslationFailCall.Value || !FailKeys.Contains(Term))
                                         {
-                                            LogWarning($"翻译插件:游戏尝试获取未翻译的条目 Key:[{Term}] 当前输出:[{__result}]");
+                                            LogWarning($"GetNoTranslation Key:[{Term}] Output:[{__result}]");
                                             if (!FailKeys.Contains(Term))
                                             {
                                                 FailKeys.Add(Term);
@@ -134,7 +133,7 @@ namespace SunHavenLocalization
             {
                 if (term.Term == Key)
                 {
-                    LogInfo($"========搜索到指定的Term [{Key}]");
+                    LogInfo($"========Term [{Key}]");
                     for (int i = 0; i < term.Languages.Length; i++)
                     {
                         LogInfo($"[{i}] {term.Languages[i]}");

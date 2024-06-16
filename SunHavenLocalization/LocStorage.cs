@@ -45,32 +45,6 @@ namespace SunHavenLocalization
                 OriginalUpdateNote = OriginalUpdateNote
             };
         }
-
-        public LocItemSave ToLocItemSave()
-        {
-            return new LocItemSave()
-            {
-                Key = Key,
-                Original = Original,
-                OriginalTranslation = OriginalTranslation,
-                Translation = Translation,
-                UpdateTime = DumpTool.TimeToString(UpdateTime),
-                UpdateMode = UpdateMode.ToString(),
-                OriginalUpdateNote = OriginalUpdateNote
-            };
-        }
-    }
-
-    [Serializable]
-    public class LocItemSave
-    {
-        public string Key = "";
-        public string Original = "";
-        public string OriginalTranslation = "";
-        public string Translation = "";
-        public string UpdateTime = "";
-        public string UpdateMode = "";
-        public string OriginalUpdateNote = "";
     }
 
     public enum UpdateMode
@@ -90,12 +64,6 @@ namespace SunHavenLocalization
     }
 
     [Serializable]
-    public class LocStorageSave
-    {
-        public Serialization<string, LocSheet> Storage;
-    }
-
-    [Serializable]
     public class LocSheet
     {
         public string LanguageName;
@@ -110,41 +78,17 @@ namespace SunHavenLocalization
         public int LineCount;
         public long OriginalCharCount;
         public Dictionary<string, LocItem> Dict = new Dictionary<string, LocItem>();
-
-        public LocSheetSave ToLocSheetSave()
-        {
-            Dictionary<string, LocItemSave> dict = new Dictionary<string, LocItemSave>();
-            foreach (var kv in Dict)
-            {
-                dict[kv.Key] = kv.Value.ToLocItemSave();
-            }
-            return new LocSheetSave()
-            {
-                LanguageName = LanguageName,
-                LanguageIndex = LanguageIndex,
-                Version = Version,
-                LastDumpTime = LastDumpTime,
-                LineCount = LineCount,
-                OriginalCharCount = OriginalCharCount,
-                Dict = new Serialization<string, LocItemSave>(dict)
-            };
-        }
     }
 
     [Serializable]
-    public class LocSheetSave
+    public class LocItemSave
     {
-        public string LanguageName;
-
-        /// <summary>
-        /// 此语言在I2语言列表中的索引
-        /// </summary>
-        public int LanguageIndex;
-
-        public int Version;
-        public DateTime LastDumpTime;
-        public int LineCount;
-        public long OriginalCharCount;
-        public Serialization<string, LocItemSave> Dict;
+        public string Key = "";
+        public string Original = "";
+        public string OriginalTranslation = "";
+        public string Translation = "";
+        public string UpdateTime = "";
+        public string UpdateMode = "";
+        public string OriginalUpdateNote = "";
     }
 }

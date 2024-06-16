@@ -1,15 +1,18 @@
-﻿using System;
-using System.IO;
-using System.Collections.Generic;
+﻿using ICSharpCode.SharpZipLib.Checksum;
 using ICSharpCode.SharpZipLib.Zip;
-using ICSharpCode.SharpZipLib.Checksum;
+using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace SunHavenLocalizationPublishTool
 {
     internal class Program
     {
+        public static string Version;
         private static void Main(string[] args)
         {
+            Console.WriteLine("请输入版本号, 例如: 1.0.0");
+            Version = Console.ReadLine();
             System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
             sw.Start();
             // 建立打包文件夹
@@ -19,50 +22,63 @@ namespace SunHavenLocalizationPublishTool
                 buildDir.Delete(true);
             }
             buildDir.Create();
-            DirectoryInfo buildDir1 = new DirectoryInfo("SunHavenLocalizationPublish/SunHavenLocalization");
+
+            DirectoryInfo dataDirInfo = new DirectoryInfo("BepInEx/plugins/SunHavenLocalization/datas");
+            var files = dataDirInfo.GetFiles("*.xyloc");
+            foreach (var file in files)
+            {
+                string lang = file.Name.Replace(".xyloc", "");
+                Build(lang);
+            }
+
+            sw.Stop();
+            Console.WriteLine($"执行完毕，共耗时{sw.ElapsedMilliseconds}ms");
+            Console.ReadLine();
+        }
+
+        public static void Build(string lang)
+        {
+            string pathNoBepInEx = $"SunHavenLocalizationPublish/SunHavenLocalization_{lang}";
+            string pathWithBepInEx = $"SunHavenLocalizationPublish/SunHavenLocalization_{lang}_WithBepInEx";
+            DirectoryInfo buildDir1 = new DirectoryInfo(pathNoBepInEx);
             if (buildDir1.Exists)
             {
                 buildDir1.Delete(true);
             }
             buildDir1.Create();
-            DirectoryInfo buildDir2 = new DirectoryInfo("SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx");
+            DirectoryInfo buildDir2 = new DirectoryInfo(pathWithBepInEx);
             if (buildDir2.Exists)
             {
                 buildDir2.Delete(true);
             }
             buildDir2.Create();
             // 不带Bep的版本
-            Console.WriteLine("开始打包不带Bep的版本...");
+            Console.WriteLine($"开始打包 {lang} 不带BepInex的版本...");
             // 复制插件
-            CopyFile("BepInEx/plugins/SunHavenLocalization/SunHavenLocalization.dll", "SunHavenLocalizationPublish/SunHavenLocalization/BepInEx/plugins/SunHavenLocalization/SunHavenLocalization.dll");
-            CopyFile("BepInEx/plugins/SunHavenLocalization/MiniExcel.dll", "SunHavenLocalizationPublish/SunHavenLocalization/BepInEx/plugins/SunHavenLocalization/MiniExcel.dll");
-            CopyFile("BepInEx/plugins/SunHavenLocalization/SunHavenLocalizationExcelTool.exe", "SunHavenLocalizationPublish/SunHavenLocalization/BepInEx/plugins/SunHavenLocalization/SunHavenLocalizationExcelTool.exe");
+            CopyFile("BepInEx/plugins/SunHavenLocalization/SunHavenLocalization.dll", $"{pathNoBepInEx}/BepInEx/plugins/SunHavenLocalization/SunHavenLocalization.dll");
+            CopyFile("BepInEx/plugins/SunHavenLocalization/SunHavenLocalizationExcelTool.exe", $"{pathNoBepInEx}/BepInEx/plugins/SunHavenLocalization/SunHavenLocalizationExcelTool.exe");
             // 复制数据
-            CopyDirectory("BepInEx/plugins/SunHavenLocalization/datas", "SunHavenLocalizationPublish/SunHavenLocalization/BepInEx/plugins/SunHavenLocalization/datas");
+            CopyFile($"BepInEx/plugins/SunHavenLocalization/datas/{lang}.xyloc", $"{pathNoBepInEx}/BepInEx/plugins/SunHavenLocalization/datas/{lang}.xyloc");
             // 文件夹压缩
-            Console.WriteLine("开始压缩不带Bep的版本...");
-            ZipFile("SunHavenLocalizationPublish/SunHavenLocalization", "SunHavenLocalization_V1_X_0.zip");
+            Console.WriteLine($"开始压缩 {lang} 不带BepInEx的版本...");
+            ZipFile(pathNoBepInEx, $"SunHavenLocalizationPublish/SunHavenLocalization_{lang}_V{Version}.zip");
 
             // 带Bep的版本
-            Console.WriteLine("开始打包带Bep的版本...");
+            Console.WriteLine($"开始打包 {lang} 带BepInEx的版本...");
             // 复制BepInEx
-            CopyDirectory("BepInEx/core", "SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx/BepInEx/core");
-            CopyFile("doorstop_config.ini", "SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx/doorstop_config.ini");
-            CopyFile("winhttp.dll", "SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx/winhttp.dll");
+            CopyDirectory("BepInEx/core", $"{pathWithBepInEx}/BepInEx/core");
+            CopyFile("doorstop_config.ini", $"{pathWithBepInEx}/doorstop_config.ini");
+            CopyFile("winhttp.dll", $"{pathWithBepInEx}/winhttp.dll");
             // 复制配置文件
-            CopyFile("BepInEx/config/BepInEx.cfg", "SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx/BepInEx/config/BepInEx.cfg");
+            CopyFile("BepInEx/config/BepInEx.cfg", $"{pathWithBepInEx}/BepInEx/config/BepInEx.cfg");
             // 复制插件
-            CopyFile("BepInEx/plugins/SunHavenLocalization/SunHavenLocalization.dll", "SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx/BepInEx/plugins/SunHavenLocalization/SunHavenLocalization.dll");
-            CopyFile("BepInEx/plugins/SunHavenLocalization/MiniExcel.dll", "SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx/BepInEx/plugins/SunHavenLocalization/MiniExcel.dll");
-            CopyFile("BepInEx/plugins/SunHavenLocalization/SunHavenLocalizationExcelTool.exe", "SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx/BepInEx/plugins/SunHavenLocalization/SunHavenLocalizationExcelTool.exe");
+            CopyFile("BepInEx/plugins/SunHavenLocalization/SunHavenLocalization.dll", $"{pathWithBepInEx}/BepInEx/plugins/SunHavenLocalization/SunHavenLocalization.dll");
+            CopyFile("BepInEx/plugins/SunHavenLocalization/SunHavenLocalizationExcelTool.exe", $"{pathWithBepInEx}/BepInEx/plugins/SunHavenLocalization/SunHavenLocalizationExcelTool.exe");
             // 复制数据
-            CopyDirectory("BepInEx/plugins/SunHavenLocalization/datas", "SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx/BepInEx/plugins/SunHavenLocalization/datas");
+            CopyFile($"BepInEx/plugins/SunHavenLocalization/datas/{lang}.xyloc", $"{pathWithBepInEx}/BepInEx/plugins/SunHavenLocalization/datas/{lang}.xyloc");
             // 文件夹压缩
-            Console.WriteLine("开始压缩带Bep的版本...");
-            ZipFile("SunHavenLocalizationPublish/SunHavenLocalization_WithBepInEx", "SunHavenLocalization_V1_X_0_WithBepInEx.zip");
-            sw.Stop();
-            Console.WriteLine($"执行完毕，共耗时{sw.ElapsedMilliseconds}ms");
-            Console.ReadLine();
+            Console.WriteLine($"开始压缩 {lang} 带BepInEx的版本...");
+            ZipFile(pathWithBepInEx, $"SunHavenLocalizationPublish/SunHavenLocalization_{lang}_V{Version}_WithBepInEx.zip");
         }
 
         public static void CopyDirectory(string srcPath, string destPath, List<string> ignoreDirs = null, List<string> ignoreFiles = null)

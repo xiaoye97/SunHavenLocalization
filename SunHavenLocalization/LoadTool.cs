@@ -1,8 +1,8 @@
 ﻿using BepInEx;
 using I2.Loc;
 using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
+using System;
 
 namespace SunHavenLocalization
 {
@@ -25,18 +25,22 @@ namespace SunHavenLocalization
                 string langName = file.Name.Replace(".xyloc", "");
                 if (storage.Storage.ContainsKey(langName))
                 {
-                    var bytes = File.ReadAllBytes(file.FullName);
-                    MemoryStream stream = new MemoryStream(bytes);
-                    //创建BinaryFormatter，准备反序列化
-                    BinaryFormatter bf = new BinaryFormatter();
-                    //反序列化
-                    var sheet = (LocSheet)bf.Deserialize(stream);
-                    //关闭流
-                    stream.Close();
-                    if (sheet != null)
+                    try
                     {
-                        storage.Storage[langName] = sheet;
-                        Debug.Log($"加载了语言库 {file.Name}");
+                        var sheet = CommonTool.LoadLocSheet(file.FullName);
+                        if (sheet != null)
+                        {
+                            storage.Storage[langName] = sheet;
+                            SunHavenLocalizationPlugin.LogInfo($"loaded language {file.Name}");
+                        }
+                        else
+                        {
+                            SunHavenLocalizationPlugin.LogError($"load language {file.Name} fail");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        SunHavenLocalizationPlugin.LogError($"Exception when load language {file.Name}:\n{ex}");
                     }
                 }
             }
