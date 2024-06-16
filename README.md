@@ -11,3 +11,5 @@
 在excel文件内做好翻译工作后, 将xlsx文件拖拽到 SunHavenLocalizationExcelTool.exe 上即可生成xyloc文件.
 
 在datas文件夹下的xyloc文件将被读取用于翻译.
+
+目前插件作者维护的语言:zh-CN, 欢迎提交其他语言的xyloc翻译文件.
