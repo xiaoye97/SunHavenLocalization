@@ -1,8 +1,8 @@
 ﻿using MiniExcelLibs;
 using SunHavenLocalization;
 using System;
-using System.Data;
 using System.Collections.Generic;
+using System.Data;
 
 namespace SunHavenLocalizationExcelTool
 {
@@ -53,6 +53,7 @@ namespace SunHavenLocalizationExcelTool
                 return;
             }
             DataTable infoTable = new DataTable();
+            infoTable.TableName = "Info";
             infoTable.Columns.Add("Info", typeof(string));
             infoTable.Columns.Add("Value", typeof(string));
             infoTable.Rows.Add("Plugin Author", "xiaoye97");
@@ -72,21 +73,49 @@ namespace SunHavenLocalizationExcelTool
             locItemSaves.Sort((a, b) => a.Key.CompareTo(b.Key));
             LocItemSave[] dataSheet = locItemSaves.ToArray();
 
-            DataTable dataTable = new DataTable();
-            dataTable.Columns.Add("Key", typeof(string));
-            dataTable.Columns.Add("Original", typeof(string));
-            dataTable.Columns.Add("OriginalTranslation", typeof(string));
-            dataTable.Columns.Add("Translation", typeof(string));
-            dataTable.Columns.Add("UpdateTime", typeof(string));
-            dataTable.Columns.Add("UpdateMode", typeof(string));
-            dataTable.Columns.Add("OriginalUpdateNote", typeof(string));
+            Dictionary<string, DataTable> tableDict = new Dictionary<string, DataTable>();
+
             foreach (var item in dataSheet)
             {
-                dataTable.Rows.Add(item.Key, item.Original, item.OriginalTranslation, item.Translation, item.UpdateTime, item.UpdateMode, item.OriginalUpdateNote);
+                if (!string.IsNullOrWhiteSpace(item.Table))
+                {
+                    if (!tableDict.ContainsKey(item.Table))
+                    {
+                        DataTable dataTable = new DataTable();
+                        dataTable.TableName = item.Table;
+                        dataTable.Columns.Add("Key", typeof(string));
+                        dataTable.Columns.Add("Original", typeof(string));
+                        dataTable.Columns.Add("OriginalTranslation", typeof(string));
+                        dataTable.Columns.Add("Translation", typeof(string));
+                        dataTable.Columns.Add("UpdateTime", typeof(string));
+                        dataTable.Columns.Add("UpdateMode", typeof(string));
+                        dataTable.Columns.Add("OriginalUpdateNote", typeof(string));
+                        tableDict[item.Table] = dataTable;
+                    }
+                    tableDict[item.Table].Rows.Add(item.Key, item.Original, item.OriginalTranslation, item.Translation, item.UpdateTime, item.UpdateMode, item.OriginalUpdateNote);
+                }
             }
+            List<string> tableNameList = new List<string>();
+            foreach (var kv in tableDict)
+            {
+                tableNameList.Add(kv.Key);
+            }
+            string tables = "";
+            for (int i = 0; i < tableNameList.Count; i++)
+            {
+                tables += tableNameList[i];
+                if (i != tableNameList.Count - 1)
+                {
+                    tables += ",";
+                }
+            }
+            infoTable.Rows.Add("SubTables", tables);
             DataSet dataSet = new DataSet();
             dataSet.Tables.Add(infoTable);
-            dataSet.Tables.Add(dataTable);
+            foreach (var kv in tableDict)
+            {
+                dataSet.Tables.Add(kv.Value);
+            }
             string path = $"{Environment.CurrentDirectory}/{sheet.LanguageName}.xlsx";
             try
             {
@@ -102,8 +131,8 @@ namespace SunHavenLocalizationExcelTool
         public static void ExcelToLoc(string excelPath)
         {
             LocSheet sheet = new LocSheet();
-            Dictionary<string, string> Table1Dict = new Dictionary<string, string>();
-            var t1 = MiniExcel.Query(excelPath, sheetName: "Table1");
+            Dictionary<string, string> infoDict = new Dictionary<string, string>();
+            var t1 = MiniExcel.Query(excelPath, sheetName: "Info");
             foreach (IDictionary<string, object> row in t1)
             {
                 List<string> list = new List<string>();
@@ -111,41 +140,48 @@ namespace SunHavenLocalizationExcelTool
                 {
                     list.Add(data.Value);
                 }
-                Table1Dict[list[0]] = list[1];
+                infoDict[list[0]] = list[1];
             }
-            sheet.LanguageName = Table1Dict["LanguageName"];
-            int.TryParse(Table1Dict["Version"], out sheet.Version);
-            sheet.LastDumpTime = CommonTool.StringToTime(Table1Dict["LastDumpTime"]);
-            int.TryParse(Table1Dict["LineCount"], out sheet.LineCount);
-            long.TryParse(Table1Dict["OriginalCharCount"], out sheet.OriginalCharCount);
+            sheet.LanguageName = infoDict["LanguageName"];
+            int.TryParse(infoDict["Version"], out sheet.Version);
+            sheet.LastDumpTime = CommonTool.StringToTime(infoDict["LastDumpTime"]);
+            int.TryParse(infoDict["LineCount"], out sheet.LineCount);
+            long.TryParse(infoDict["OriginalCharCount"], out sheet.OriginalCharCount);
+            string tables = infoDict["SubTables"];
+            string[] tableNames = tables.Split(',');
 
             sheet.Dict = new Dictionary<string, LocItem>();
-            var t2 = MiniExcel.Query(excelPath, sheetName: "Table2");
-            int line = 0;
-            foreach (IDictionary<string, object> row in t2)
+            foreach (string tableName in tableNames)
             {
-                if (line == 0)
+                var t2 = MiniExcel.Query(excelPath, sheetName: tableName);
+                int line = 0;
+                foreach (IDictionary<string, object> row in t2)
                 {
-                    line++;
-                    continue;
-                }
-                List<string> list = new List<string>();
-                foreach (dynamic data in row)
-                {
-                    list.Add(data.Value);
-                }
+                    if (line == 0)
+                    {
+                        line++;
+                        continue;
+                    }
+                    List<string> list = new List<string>();
+                    foreach (dynamic data in row)
+                    {
+                        list.Add(data.Value);
+                    }
 
-                LocItem locItem = new LocItem();
-                locItem.Key = list[0];
-                locItem.Original = list[1];
-                locItem.OriginalTranslation = list[2];
-                locItem.Translation = list[3];
-                locItem.UpdateTime = CommonTool.StringToTime(list[4]);
-                locItem.UpdateMode = (UpdateMode)Enum.Parse(typeof(UpdateMode), list[5]);
-                locItem.OriginalUpdateNote = list[6];
-                sheet.Dict[locItem.Key] = locItem;
-                line++;
+                    LocItem locItem = new LocItem();
+                    locItem.Key = list[0];
+                    locItem.Original = list[1];
+                    locItem.OriginalTranslation = list[2];
+                    locItem.Translation = list[3];
+                    locItem.UpdateTime = CommonTool.StringToTime(list[4]);
+                    locItem.UpdateMode = (UpdateMode)Enum.Parse(typeof(UpdateMode), list[5]);
+                    locItem.OriginalUpdateNote = list[6];
+                    locItem.Table = tableName;
+                    sheet.Dict[locItem.Key] = locItem;
+                    line++;
+                }
             }
+
             string path = $"{Environment.CurrentDirectory}/{sheet.LanguageName}.xyloc";
             try
             {
@@ -173,7 +209,8 @@ namespace SunHavenLocalizationExcelTool
                 Translation = locItem.Translation,
                 UpdateTime = CommonTool.TimeToString(locItem.UpdateTime),
                 UpdateMode = locItem.UpdateMode.ToString(),
-                OriginalUpdateNote = locItem.OriginalUpdateNote
+                OriginalUpdateNote = locItem.OriginalUpdateNote,
+                Table = locItem.Table,
             };
         }
     }

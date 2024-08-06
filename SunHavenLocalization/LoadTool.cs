@@ -10,9 +10,9 @@ namespace SunHavenLocalization
     {
         public static void LoadAll()
         {
-            var source = GameObject.FindObjectOfType<LanguageSource>();
+            var sourceAssets = Resources.FindObjectsOfTypeAll<LanguageSourceAsset>();
             LocStorage storage = new LocStorage();
-            DumpTool.InitStorage(source, storage);
+            DumpTool.InitStorage(sourceAssets[0].SourceData, storage);
             string saveDir = Paths.PluginPath + "/SunHavenLocalization/datas";
             DirectoryInfo directory = new DirectoryInfo(saveDir);
             if (!directory.Exists)

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using Wish;
 
 namespace SunHavenLocalization
 {
@@ -12,7 +13,7 @@ namespace SunHavenLocalization
         public static void DumpAll()
         {
             DateTime now = DateTime.Now;
-            var source = GameObject.FindObjectOfType<LanguageSource>();
+            var sourceAssets = Resources.FindObjectsOfTypeAll<LanguageSourceAsset>();
             LocStorage lastStorage = null;
             if (SunHavenLocalizationPlugin.LoadedLocStorage != null)
             {
@@ -21,19 +22,22 @@ namespace SunHavenLocalization
             else
             {
                 lastStorage = new LocStorage();
-                InitStorage(source, lastStorage);
+                InitStorage(sourceAssets[0].SourceData, lastStorage);
             }
             LocStorage newStorage = new LocStorage();
-            InitStorage(source, newStorage);
-            int termCount = source.SourceData.mTerms.Count;
+            InitStorage(sourceAssets[0].SourceData, newStorage);
             List<string> newKeyList = new List<string>();
-            foreach (var term in source.SourceData.mTerms)
+            foreach (LanguageSourceAsset sourceAsset in sourceAssets)
             {
-                if (term.TermType == eTermType.Text)
+                foreach (var term in sourceAsset.SourceData.mTerms)
                 {
-                    newKeyList.Add(term.Term);
+                    if (term.TermType == eTermType.Text)
+                    {
+                        newKeyList.Add(term.Term);
+                    }
                 }
             }
+
             // 复制老表到新表, 并统计老表中被移除的条目, 将这些条目标记为移除
             foreach (var sheetKV in lastStorage.Storage)
             {
@@ -55,58 +59,64 @@ namespace SunHavenLocalization
                 }
             }
             // 添加新的条目和更新老条目内容
-            for (int i = 0; i < termCount; i++)
+            foreach (LanguageSourceAsset sourceAsset in sourceAssets)
             {
-                var term = source.SourceData.mTerms[i];
-                if (term.TermType == eTermType.Text)
+                int termCount = sourceAsset.SourceData.mTerms.Count;
+                for (int i = 0; i < termCount; i++)
                 {
-                    string key = term.Term;
-                    string ori = term.Languages[0];
-                    for (int langIndex = 0; langIndex < term.Languages.Length; langIndex++)
+                    var term = sourceAsset.SourceData.mTerms[i];
+                    if (term.TermType == eTermType.Text)
                     {
-                        if (newStorage.IndexLangNameDict.ContainsKey(langIndex))
+                        string key = term.Term;
+                        string ori = term.Languages[0];
+                        for (int langIndex = 0; langIndex < term.Languages.Length; langIndex++)
                         {
-                            string oriTranslation = term.Languages[langIndex];
-                            string langName = newStorage.IndexLangNameDict[langIndex];
-                            LocSheet newSheet = newStorage.Storage[langName];
-                            // 如果表里有此条目, 则检查是否更新了
-                            if (newSheet.Dict.ContainsKey(key))
+                            if (newStorage.IndexLangNameDict.ContainsKey(langIndex))
                             {
-                                var item = newSheet.Dict[key];
-                                // 如果条目没有更新, 则将更新类型置为空
-                                if (item.Original == ori)
+                                string oriTranslation = term.Languages[langIndex];
+                                string langName = newStorage.IndexLangNameDict[langIndex];
+                                LocSheet newSheet = newStorage.Storage[langName];
+                                // 如果表里有此条目, 则检查是否更新了
+                                if (newSheet.Dict.ContainsKey(key))
                                 {
-                                    item.UpdateMode = UpdateMode.None;
-                                    item.OriginalUpdateNote = "";
+                                    var item = newSheet.Dict[key];
+                                    item.Table = sourceAsset.name;
+                                    // 如果条目没有更新, 则将更新类型置为空
+                                    if (item.Original == ori)
+                                    {
+                                        item.UpdateMode = UpdateMode.None;
+                                        item.OriginalUpdateNote = "";
+                                    }
+                                    // 如果条目有更新, 则将更新类型置为更新
+                                    else
+                                    {
+                                        item.OriginalUpdateNote = $"[{CommonTool.TimeToString(item.UpdateTime)}]{item.Original}\n[{CommonTool.TimeToString(now)}]{ori}";
+                                        item.Original = ori;
+                                        item.OriginalTranslation = oriTranslation;
+                                        item.UpdateTime = now;
+                                        item.UpdateMode = UpdateMode.Update;
+                                    }
                                 }
-                                // 如果条目有更新, 则将更新类型置为更新
+                                // 如果表里没有此条目, 则新增
                                 else
                                 {
-                                    item.OriginalUpdateNote = $"[{CommonTool.TimeToString(item.UpdateTime)}]{item.Original}\n[{CommonTool.TimeToString(now)}]{ori}";
-
-                                    item.Original = ori;
-                                    item.OriginalTranslation = oriTranslation;
-                                    item.UpdateTime = now;
-                                    item.UpdateMode = UpdateMode.Update;
+                                    LocItem item = new LocItem()
+                                    {
+                                        Key = key,
+                                        Original = ori,
+                                        OriginalTranslation = oriTranslation,
+                                        UpdateTime = now,
+                                        UpdateMode = UpdateMode.New,
+                                        Table = sourceAsset.name
+                                    };
+                                    newSheet.Dict[key] = item;
                                 }
-                            }
-                            // 如果表里没有此条目, 则新增
-                            else
-                            {
-                                LocItem item = new LocItem()
-                                {
-                                    Key = key,
-                                    Original = ori,
-                                    OriginalTranslation = oriTranslation,
-                                    UpdateTime = now,
-                                    UpdateMode = UpdateMode.New
-                                };
-                                newSheet.Dict[key] = item;
                             }
                         }
                     }
                 }
             }
+                
             // 更新统计信息
             foreach (var sheetKV in newStorage.Storage)
             {
@@ -156,13 +166,13 @@ namespace SunHavenLocalization
             }
         }
 
-        public static void InitStorage(LanguageSource source, LocStorage store)
+        public static void InitStorage(LanguageSourceData sourceData, LocStorage store)
         {
             store.LangNameIndexDict.Clear();
             store.IndexLangNameDict.Clear();
-            for (int i = 0; i < source.SourceData.mLanguages.Count; i++)
+            for (int i = 0; i < sourceData.mLanguages.Count; i++)
             {
-                var lang = source.SourceData.mLanguages[i];
+                var lang = sourceData.mLanguages[i];
                 if (!string.IsNullOrWhiteSpace(lang.Code))
                 {
                     store.LangNameIndexDict[lang.Code] = i;

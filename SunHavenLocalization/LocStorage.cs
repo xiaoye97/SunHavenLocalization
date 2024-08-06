@@ -32,6 +32,11 @@ namespace SunHavenLocalization
         /// </summary>
         public string OriginalUpdateNote;
 
+        /// <summary>
+        /// 所属表格
+        /// </summary>
+        public string Table;
+
         public LocItem Clone()
         {
             return new LocItem()
@@ -42,7 +47,8 @@ namespace SunHavenLocalization
                 OriginalTranslation = OriginalTranslation,
                 UpdateTime = UpdateTime,
                 UpdateMode = UpdateMode,
-                OriginalUpdateNote = OriginalUpdateNote
+                OriginalUpdateNote = OriginalUpdateNote,
+                Table = Table,
             };
         }
     }
@@ -90,5 +96,6 @@ namespace SunHavenLocalization
         public string UpdateTime = "";
         public string UpdateMode = "";
         public string OriginalUpdateNote = "";
+        public string Table = "";
     }
 }
