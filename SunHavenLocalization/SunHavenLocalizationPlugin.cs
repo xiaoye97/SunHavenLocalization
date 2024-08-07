@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace SunHavenLocalization
 {
-    [BepInPlugin("xiaoye97.SunHavenLocalization", "SunHavenLocalization", "1.0.0")]
+    [BepInPlugin("xiaoye97.SunHavenLocalization", "SunHavenLocalization", "1.1.0")]
     public class SunHavenLocalizationPlugin : BaseUnityPlugin
     {
         public static SunHavenLocalizationPlugin Instance;
