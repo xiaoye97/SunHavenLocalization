@@ -17,8 +17,16 @@ namespace SunHavenLocalization
 
         public static DateTime StringToTime(string str)
         {
-            DateTime dateTime = DateTime.ParseExact(str, TimeFormat, CultureInfo.InvariantCulture);
-            return dateTime;
+            try
+            {
+                DateTime dateTime = DateTime.ParseExact(str, TimeFormat, CultureInfo.InvariantCulture);
+                return dateTime;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"字符串转换时间出错:[{str}]，异常信息：\n{e}");
+                return DateTime.MinValue;
+            }
         }
 
         public static void SaveLocSheet(string path, LocSheet sheet)

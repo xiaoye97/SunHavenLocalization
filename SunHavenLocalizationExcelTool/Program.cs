@@ -165,7 +165,14 @@ namespace SunHavenLocalizationExcelTool
                     List<string> list = new List<string>();
                     foreach (dynamic data in row)
                     {
-                        list.Add(data.Value);
+                        if (data.Value != null)
+                        {
+                            list.Add(data.Value.ToString());
+                        }
+                        else
+                        {
+                            list.Add("");
+                        }
                     }
 
                     LocItem locItem = new LocItem();

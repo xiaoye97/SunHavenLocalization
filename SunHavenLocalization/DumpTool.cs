@@ -3,8 +3,8 @@ using I2.Loc;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
-using Wish;
 
 namespace SunHavenLocalization
 {
@@ -29,6 +29,17 @@ namespace SunHavenLocalization
             List<string> newKeyList = new List<string>();
             foreach (LanguageSourceAsset sourceAsset in sourceAssets)
             {
+                // 一个特殊处理，quest表的22个语言，而其他表是21个语言，删除quest表的第一个语言
+                if (sourceAsset.SourceData.mLanguages.Count > sourceAssets[0].SourceData.mLanguages.Count)
+                {
+                    sourceAsset.SourceData.mLanguages.RemoveAt(0);
+                    foreach (var term in sourceAsset.SourceData.mTerms)
+                    {
+                        var newList = term.Languages.ToList();
+                        newList.RemoveAt(0);
+                        term.Languages = newList.ToArray();
+                    }
+                }
                 foreach (var term in sourceAsset.SourceData.mTerms)
                 {
                     if (term.TermType == eTermType.Text)
@@ -116,7 +127,7 @@ namespace SunHavenLocalization
                     }
                 }
             }
-                
+
             // 更新统计信息
             foreach (var sheetKV in newStorage.Storage)
             {
