@@ -1,8 +1,9 @@
 # SunHavenLocalization
 
-用于完善 太阳港 的多国语言翻译插件.
+用于完善 太阳港 的多国语言翻译插件. 基于xiaoye97版本开发。
+https://github.com/xiaoye97/SunHavenLocalization
 
-由于太阳港的官方中文全是粗糙的机器翻译, 所以我制作了这个插件, 用来修改翻译.
+由于太阳港的官方中文全是粗糙的机器翻译, 所以fork了xiaoye97的初版插件, 用来修改翻译.
 
 这个插件不止可以修改中文的翻译, 其他所有语言也都可以.
 
