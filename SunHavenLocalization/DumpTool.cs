@@ -1,4 +1,4 @@
-﻿using BepInEx;
+using BepInEx;
 using I2.Loc;
 using System;
 using System.Collections.Generic;
@@ -13,34 +13,65 @@ namespace SunHavenLocalization
         public static void DumpAll()
         {
             DateTime now = DateTime.Now;
-            var sourceAssets = Resources.FindObjectsOfTypeAll<LanguageSourceAsset>();
+            SunHavenLocalizationPlugin.LogInfo("[DumpAll] Starting dump...");
+
+            var sourceDataArray = CommonTool.FindAllSourceData();
+            SunHavenLocalizationPlugin.LogInfo($"[DumpAll] Found {sourceDataArray.Length} source(s).");
+
+            if (sourceDataArray.Length == 0)
+            {
+                SunHavenLocalizationPlugin.LogError("[DumpAll] No LanguageSourceAsset or LanguageSource found! Localization data may not be loaded yet.");
+                return;
+            }
+
+            // Log each source
+            for (int i = 0; i < sourceDataArray.Length; i++)
+            {
+                var sd = sourceDataArray[i];
+                int termCount = sd != null ? sd.mTerms.Count : 0;
+                int langCount = sd != null ? sd.mLanguages.Count : 0;
+                SunHavenLocalizationPlugin.LogInfo($"[DumpAll]   Source[{i}]: terms={termCount}, languages={langCount}");
+            }
+
             LocStorage lastStorage = null;
             if (SunHavenLocalizationPlugin.LoadedLocStorage != null)
             {
                 lastStorage = SunHavenLocalizationPlugin.LoadedLocStorage;
+                SunHavenLocalizationPlugin.LogInfo("[DumpAll] Using existing LoadedLocStorage.");
             }
             else
             {
+                SunHavenLocalizationPlugin.LogInfo("[DumpAll] No existing LoadedLocStorage, initializing new one...");
                 lastStorage = new LocStorage();
-                InitStorage(sourceAssets[0].SourceData, lastStorage);
+                InitStorage(sourceDataArray[0], lastStorage);
             }
+
             LocStorage newStorage = new LocStorage();
-            InitStorage(sourceAssets[0].SourceData, newStorage);
-            List<string> newKeyList = new List<string>();
-            foreach (LanguageSourceAsset sourceAsset in sourceAssets)
+            InitStorage(sourceDataArray[0], newStorage);
+            SunHavenLocalizationPlugin.LogInfo($"[DumpAll] New storage initialized with {newStorage.Storage.Count} languages.");
+
+            // Log language list
+            foreach (var kv in newStorage.Storage)
             {
-                // 一个特殊处理，quest表的22个语言，而其他表是21个语言，删除quest表的第一个语言
-                if (sourceAsset.SourceData.mLanguages.Count > sourceAssets[0].SourceData.mLanguages.Count)
+                SunHavenLocalizationPlugin.LogInfo($"[DumpAll]   Language: {kv.Key} (index={kv.Value.LanguageIndex})");
+            }
+
+            List<string> newKeyList = new List<string>();
+            foreach (var sourceData in sourceDataArray)
+            {
+                // Special handling: quest table has 22 languages, others have 21
+                if (sourceData.mLanguages.Count > sourceDataArray[0].mLanguages.Count)
                 {
-                    sourceAsset.SourceData.mLanguages.RemoveAt(0);
-                    foreach (var term in sourceAsset.SourceData.mTerms)
+                    SunHavenLocalizationPlugin.LogWarning($"[DumpAll] Source has {sourceData.mLanguages.Count} languages (expected {sourceDataArray[0].mLanguages.Count}). Removing first language.");
+                    sourceData.mLanguages.RemoveAt(0);
+                    foreach (var term in sourceData.mTerms)
                     {
                         var newList = term.Languages.ToList();
                         newList.RemoveAt(0);
                         term.Languages = newList.ToArray();
                     }
                 }
-                foreach (var term in sourceAsset.SourceData.mTerms)
+                foreach (var term in sourceData.mTerms)
                 {
                     if (term.TermType == eTermType.Text)
                     {
@@ -48,11 +79,18 @@ namespace SunHavenLocalization
                     }
                 }
             }
+            SunHavenLocalizationPlugin.LogInfo($"[DumpAll] Total text terms across all sources: {newKeyList.Count}");
 
-            // 复制老表到新表, 并统计老表中被移除的条目, 将这些条目标记为移除
+            // Copy old entries and mark removed ones
+            int removedCount = 0;
             foreach (var sheetKV in lastStorage.Storage)
             {
                 var lastSheet = sheetKV.Value;
+                if (!newStorage.Storage.ContainsKey(sheetKV.Key))
+                {
+                    SunHavenLocalizationPlugin.LogWarning($"[DumpAll] Language '{sheetKV.Key}' not found in new storage, skipping.");
+                    continue;
+                }
                 var newSheet = newStorage.Storage[sheetKV.Key];
                 newSheet.Version = lastSheet.Version;
                 foreach (var kv in lastSheet.Dict)
@@ -64,18 +102,24 @@ namespace SunHavenLocalization
                         {
                             item.UpdateMode = UpdateMode.Remove;
                             item.UpdateTime = now;
+                            removedCount++;
                         }
                     }
                     newSheet.Dict[kv.Key] = item;
                 }
             }
-            // 添加新的条目和更新老条目内容
-            foreach (LanguageSourceAsset sourceAsset in sourceAssets)
+            SunHavenLocalizationPlugin.LogInfo($"[DumpAll] Marked {removedCount} entries as removed.");
+
+            // Add new entries and update existing ones
+            int newCount = 0;
+            int updatedCount = 0;
+            foreach (var sourceData in sourceDataArray)
             {
-                int termCount = sourceAsset.SourceData.mTerms.Count;
+                int termCount = sourceData.mTerms.Count;
+                SunHavenLocalizationPlugin.LogInfo($"[DumpAll] Processing source ({termCount} terms)...");
                 for (int i = 0; i < termCount; i++)
                 {
-                    var term = sourceAsset.SourceData.mTerms[i];
+                    var term = sourceData.mTerms[i];
                     if (term.TermType == eTermType.Text)
                     {
                         string key = term.Term;
@@ -87,18 +131,14 @@ namespace SunHavenLocalization
                                 string oriTranslation = term.Languages[langIndex];
                                 string langName = newStorage.IndexLangNameDict[langIndex];
                                 LocSheet newSheet = newStorage.Storage[langName];
-                                // 如果表里有此条目, 则检查是否更新了
                                 if (newSheet.Dict.ContainsKey(key))
                                 {
                                     var item = newSheet.Dict[key];
-                                    item.Table = sourceAsset.name;
-                                    // 如果条目没有更新, 则将更新类型置为空
                                     if (item.Original == ori)
                                     {
                                         item.UpdateMode = UpdateMode.None;
                                         item.OriginalUpdateNote = "";
                                     }
-                                    // 如果条目有更新, 则将更新类型置为更新
                                     else
                                     {
                                         item.OriginalUpdateNote = $"[{CommonTool.TimeToString(item.UpdateTime)}]{item.Original}\n[{CommonTool.TimeToString(now)}]{ori}";
@@ -106,9 +146,9 @@ namespace SunHavenLocalization
                                         item.OriginalTranslation = oriTranslation;
                                         item.UpdateTime = now;
                                         item.UpdateMode = UpdateMode.Update;
+                                        updatedCount++;
                                     }
                                 }
-                                // 如果表里没有此条目, 则新增
                                 else
                                 {
                                     LocItem item = new LocItem()
@@ -118,17 +158,18 @@ namespace SunHavenLocalization
                                         OriginalTranslation = oriTranslation,
                                         UpdateTime = now,
                                         UpdateMode = UpdateMode.New,
-                                        Table = sourceAsset.name
                                     };
                                     newSheet.Dict[key] = item;
+                                    newCount++;
                                 }
                             }
                         }
                     }
                 }
             }
+            SunHavenLocalizationPlugin.LogInfo($"[DumpAll] New entries: {newCount}, Updated entries: {updatedCount}");
 
-            // 更新统计信息
+            // Update statistics
             foreach (var sheetKV in newStorage.Storage)
             {
                 var sheet = sheetKV.Value;
@@ -145,8 +186,11 @@ namespace SunHavenLocalization
                     }
                 }
                 sheet.OriginalCharCount = charCount;
+                SunHavenLocalizationPlugin.LogInfo($"[DumpAll]   {sheetKV.Key}: {sheet.LineCount} entries, {charCount} chars");
             }
+
             SaveLocStorage(newStorage);
+            SunHavenLocalizationPlugin.LogInfo("[DumpAll] Dump complete!");
         }
 
         public static void SaveLocStorage(LocStorage locStorage)
@@ -156,6 +200,7 @@ namespace SunHavenLocalization
             if (!directory.Exists)
             {
                 directory.Create();
+                SunHavenLocalizationPlugin.LogInfo($"[SaveLocStorage] Created directory: {saveDir}");
             }
             foreach (var sheetKV in locStorage.Storage)
             {
@@ -169,11 +214,11 @@ namespace SunHavenLocalization
             try
             {
                 CommonTool.SaveLocSheet(path, sheet);
-                SunHavenLocalizationPlugin.LogInfo($"saved {path}");
+                SunHavenLocalizationPlugin.LogInfo($"[SaveLocSheet] Saved {path} ({sheet.Dict.Count} entries)");
             }
             catch (Exception ex)
             {
-                SunHavenLocalizationPlugin.LogError($"Exception when save {path}:\n{ex}");
+                SunHavenLocalizationPlugin.LogError($"[SaveLocSheet] Exception when save {path}:\n{ex}");
             }
         }
 

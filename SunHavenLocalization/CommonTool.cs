@@ -3,6 +3,8 @@ using System.IO;
 using System.Globalization;
 using System.IO.Compression;
 using System.Runtime.Serialization.Formatters.Binary;
+using I2.Loc;
+using UnityEngine;
 
 namespace SunHavenLocalization
 {
@@ -27,6 +29,38 @@ namespace SunHavenLocalization
                 Console.WriteLine($"字符串转换时间出错:[{str}]，异常信息：\n{e}");
                 return DateTime.MinValue;
             }
+        }
+
+        /// <summary>
+        /// 查找所有 LanguageSourceData，兼容 LanguageSourceAsset 和 LanguageSource。
+        /// 优先搜索 LanguageSourceAsset（ScriptableObject），找不到则回退到 LanguageSource（MonoBehaviour）。
+        /// </summary>
+        public static LanguageSourceData[] FindAllSourceData()
+        {
+            // 优先尝试 LanguageSourceAsset
+            var sourceAssets = Resources.FindObjectsOfTypeAll<LanguageSourceAsset>();
+            if (sourceAssets.Length > 0)
+            {
+                SunHavenLocalizationPlugin.LogInfo($"[FindAllSourceData] Found {sourceAssets.Length} LanguageSourceAsset(s).");
+                var result = new LanguageSourceData[sourceAssets.Length];
+                for (int i = 0; i < sourceAssets.Length; i++)
+                    result[i] = sourceAssets[i].SourceData;
+                return result;
+            }
+
+            // 回退：尝试 LanguageSource（MonoBehaviour）
+            var sources = Resources.FindObjectsOfTypeAll<LanguageSource>();
+            if (sources.Length > 0)
+            {
+                SunHavenLocalizationPlugin.LogInfo($"[FindAllSourceData] Found {sources.Length} LanguageSource(s) (fallback).");
+                var result = new LanguageSourceData[sources.Length];
+                for (int i = 0; i < sources.Length; i++)
+                    result[i] = sources[i].SourceData;
+                return result;
+            }
+
+            SunHavenLocalizationPlugin.LogWarning("[FindAllSourceData] No LanguageSourceAsset or LanguageSource found.");
+            return new LanguageSourceData[0];
         }
 
         public static void SaveLocSheet(string path, LocSheet sheet)
