@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 
 namespace SunHavenLocalization
 {
-    [BepInPlugin("xiaoye97.SunHavenLocalization", "SunHavenLocalization", "1.3.7")]
+    [BepInPlugin("xiaoye97.SunHavenLocalization", "SunHavenLocalization", "1.3.8")]
     public class SunHavenLocalizationPlugin : BaseUnityPlugin
     {
         public static SunHavenLocalizationPlugin Instance;
@@ -47,7 +47,7 @@ namespace SunHavenLocalization
             LogGetTranslationFailCall = Config.Bind<bool>("dev", "LogGetTranslationFailCall", false, "Log LocalizationManager.GetTranslation fail call");
             AllowMultipleTimesLogGetTranslationSuccCall = Config.Bind<bool>("dev", "AllowMultipleTimesLogGetTranslationSuccCall", false);
             AllowMultipleTimesLogGetTranslationFailCall = Config.Bind<bool>("dev", "AllowMultipleTimesLogGetTranslationFailCall", false);
-            LogInfo("=== SunHavenLocalization v1.3.7 Loading ===");
+            LogInfo("=== SunHavenLocalization v1.3.8 Loading ===");
             try
             {
                 var harmony = new Harmony("xiaoye97.SunHavenLocalization");
@@ -65,7 +65,7 @@ namespace SunHavenLocalization
             StartCoroutine(DelayedLoadAll("startup", 180));
 
             Credits.ShowCredits();
-            LogInfo("=== SunHavenLocalization v1.3.7 Loaded ===");
+            LogInfo("=== SunHavenLocalization v1.3.8 Loaded ===");
         }
 
         /// <summary>
@@ -171,13 +171,31 @@ namespace SunHavenLocalization
             if (translateText == null)
             {
                 LogWarning("Wish.LocalizeText.TranslateText not found; quest progress fallback patch skipped.");
-                return;
+            }
+            else
+            {
+                harmony.Patch(
+                    translateText,
+                    postfix: new HarmonyMethod(typeof(SunHavenLocalizationPlugin), nameof(LocalizeText_TranslateText_Postfix)));
+                LogInfo("Patched Wish.LocalizeText.TranslateText.");
             }
 
-            harmony.Patch(
-                translateText,
-                postfix: new HarmonyMethod(typeof(SunHavenLocalizationPlugin), nameof(LocalizeText_TranslateText_Postfix)));
-            LogInfo("Patched Wish.LocalizeText.TranslateText.");
+            var bookHandlerType = AccessTools.TypeByName("Wish.BookHandler");
+            var readBook = bookHandlerType == null
+                ? null
+                : AccessTools.Method(bookHandlerType, "ReadBook", new[] { typeof(string) });
+
+            if (readBook == null)
+            {
+                LogWarning("Wish.BookHandler.ReadBook not found; book text patch skipped.");
+            }
+            else
+            {
+                harmony.Patch(
+                    readBook,
+                    prefix: new HarmonyMethod(typeof(SunHavenLocalizationPlugin), nameof(BookHandler_ReadBook_Prefix)));
+                LogInfo("Patched Wish.BookHandler.ReadBook.");
+            }
         }
 
         private static bool TryGetLoadedTranslation(string term, out string translation)
@@ -221,6 +239,30 @@ namespace SunHavenLocalization
                    lower.Contains("icon") ||
                    term.EndsWith("Outlined", StringComparison.Ordinal) ||
                    term.EndsWith(" SDF", StringComparison.Ordinal);
+        }
+
+        private static bool ShouldApplyChineseLocalization()
+        {
+            try
+            {
+                string currentCode = LocalizationManager.CurrentLanguageCode;
+                if (currentCode == "zh-CN" ||
+                    currentCode == "zh" ||
+                    currentCode == "ChineseSimplified")
+                {
+                    return true;
+                }
+
+                string currentLanguage = LocalizationManager.CurrentLanguage;
+                return currentLanguage == "Chinese" ||
+                       currentLanguage == "ChineseSimplified" ||
+                       currentLanguage == "Chinese (Simplified)" ||
+                       currentLanguage == "简体中文";
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static bool TryGetPreferredSheet(out LocSheet sheet)
@@ -602,6 +644,9 @@ namespace SunHavenLocalization
                 if (LoadedLocStorage == null)
                     return;
 
+                if (!ShouldApplyChineseLocalization())
+                    return;
+
                 if (TryGetLoadedTranslation(Term, out var translation))
                 {
                     __result = translation;
@@ -648,6 +693,9 @@ namespace SunHavenLocalization
                 if (LoadedLocStorage == null)
                     return;
 
+                if (!ShouldApplyChineseLocalization())
+                    return;
+
                 if (TryGetLoadedTranslation(Term, out var translation))
                 {
                     __result = translation;
@@ -690,6 +738,9 @@ namespace SunHavenLocalization
                 if (LoadedLocStorage == null)
                     return;
 
+                if (!ShouldApplyChineseLocalization())
+                    return;
+
                 if (TryGetLoadedTranslation(key, out var translation))
                 {
                     __result = translation;
@@ -719,6 +770,66 @@ namespace SunHavenLocalization
             }
         }
 
+        public static void BookHandler_ReadBook_Prefix(ref string text)
+        {
+            try
+            {
+                if (LoadedLocStorage == null || string.IsNullOrWhiteSpace(text))
+                    return;
+
+                if (!ShouldApplyChineseLocalization())
+                    return;
+
+                if (TryGetLoadedBookTextTranslation(text, out var translation))
+                    text = translation;
+            }
+            catch (Exception ex)
+            {
+                LogError($"BookHandler.ReadBook prefix exception: {ex}");
+            }
+        }
+
+        private static bool TryGetLoadedBookTextTranslation(string sourceText, out string translation)
+        {
+            translation = null;
+
+            if (TryBuildBookTextKey(sourceText, out var bookTextKey) &&
+                TryGetLoadedTranslation(bookTextKey, out translation))
+            {
+                return true;
+            }
+
+            return TryGetLoadedTranslationByOriginal(sourceText, out translation);
+        }
+
+        private static bool TryBuildBookTextKey(string sourceText, out string key)
+        {
+            key = null;
+
+            if (string.IsNullOrWhiteSpace(sourceText) ||
+                !sourceText.Contains("<align=\"center\">") ||
+                !sourceText.Contains("</align>"))
+            {
+                return false;
+            }
+
+            string normalized = sourceText.Replace("\r\n", "\n").Replace("\r", "\n");
+            var match = System.Text.RegularExpressions.Regex.Match(
+                normalized,
+                @"<align=""center"">\s*(?:[^\n]*\n)+\s*(Origins of .+?)\s*\n\s*(Book\s+[IVX]+)\s*</align>",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+
+            if (!match.Success)
+                return false;
+
+            string keyBase = BuildLocalizationKeyBase(match.Groups[1].Value + " " + match.Groups[2].Value);
+            if (string.IsNullOrWhiteSpace(keyBase))
+                return false;
+
+            key = "BookText." + keyBase + ".Text";
+            return true;
+        }
+
         [HarmonyPostfix]
         [HarmonyPatch(typeof(TMPro.TMP_Text), "text", HarmonyLib.MethodType.Setter)]
         public static void TMPText_SetText_Postfix(TMPro.TMP_Text __instance)
@@ -736,6 +847,9 @@ namespace SunHavenLocalization
         private static void FixKnownTextSetterText(string text, System.Action<string> setText)
         {
             if (_isApplyingTextFix || string.IsNullOrEmpty(text))
+                return;
+
+            if (!ShouldApplyChineseLocalization())
                 return;
 
             if (!LooksLikeKnownHardcodedText(text))
